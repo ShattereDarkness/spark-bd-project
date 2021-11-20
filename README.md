@@ -1,1 +1,1 @@
-    In this project we plan to implement Machine Learning with Spark MLlib on the sentiment analysis database.
+    In this project we plan to implement Machine Learning with Spark MLlib to detect spam emails
