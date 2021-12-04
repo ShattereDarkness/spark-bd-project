@@ -24,10 +24,13 @@ def removeNonAlphaNumeric(rdd):
     if len(l):
         regex = re.compile('[^a-zA-Z]')
         l.map(lambda i: regex.sub('', i))
-        # l = ["a#bc1!","a(b$c"]
+    
+    return rdd
 
 def func(rdd):
-    if len(rdd.collect()):        
+    if len(rdd.collect()): 
+        rdd = removeNonAlphaNumeric(rdd)
+
         df = spark.createDataFrame(json.loads(rdd.collect()[0]).values(), schema)
         
         # tokenizer = Tokenizer(inputCol="feature0", outputCol="words") 
@@ -54,7 +57,6 @@ def func(rdd):
         print(new_data[2])
 
 lines = ssc.socketTextStream("localhost", 6100)
-lines.foreachRDD(removeNonAlphaNumeric)
 lines.foreachRDD(func)
 
 ssc.start()
