@@ -23,12 +23,14 @@ def removeNonAlphaNumeric(rdd):
 
     if len(l):
         regex = re.compile('[^a-zA-Z]')
-        l.map(lambda i: regex.sub('', i))
+        rdd.map(lambda i: regex.sub('', i))
     
     return rdd
 
 def func(rdd):
-    if len(rdd.collect()): 
+    l = rdd.collect()
+
+    if len(l): 
         rdd = removeNonAlphaNumeric(rdd)
 
         df = spark.createDataFrame(json.loads(rdd.collect()[0]).values(), schema)
@@ -41,7 +43,7 @@ def func(rdd):
         # cleaner = data_prep_pipe.fit(df)
         # clean_data = cleaner.transform(df)
 
-        new_data = df.collect()
+        df.select('feature0').show()
 
         # l = []
         # for row in new_data:
@@ -54,7 +56,6 @@ def func(rdd):
         # le = LabelEncoder()
         # y = le.fit(new_data["feature2"])
 
-        print(new_data[2])
 
 lines = ssc.socketTextStream("localhost", 6100)
 lines.foreachRDD(func)
