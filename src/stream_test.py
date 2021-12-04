@@ -7,6 +7,8 @@ from pyspark.ml import Pipeline
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.preprocessing import LabelEncoder
 import json
+import re
+
 
 # Initialize the spark context.
 sc = SparkContext(appName="ScamStreaming")
@@ -15,6 +17,14 @@ ssc = StreamingContext(sc, 5)
 spark = SparkSession(sc)
 
 schema = StructType([StructField("feature0", StringType(), True), StructField("feature1", StringType(), True), StructField("feature2", StringType(), True)])
+
+def removeNonAlphaNumeric(rdd):
+    l = rdd.collect()
+
+    if len(l):
+        regex = re.compile('[^a-zA-Z]')
+        l.map(lambda i: regex.sub('', i))
+        # l = ["a#bc1!","a(b$c"]
 
 def func(rdd):
     if len(rdd.collect()):        
@@ -44,6 +54,7 @@ def func(rdd):
         print(new_data[2])
 
 lines = ssc.socketTextStream("localhost", 6100)
+lines.foreachRDD(removeNonAlphaNumeric)
 lines.foreachRDD(func)
 
 ssc.start()
