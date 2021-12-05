@@ -24,9 +24,10 @@ spark = SparkSession(sc)
 
 schema = StructType([StructField("feature0", StringType(), True), StructField("feature1", StringType(), True), StructField("feature2", StringType(), True)])
 
-vectorizer = HashingVectorizer()
+vectorizer = HashingVectorizer(alternate_sign=False)
 le = LabelEncoder()
 mnb = MultinomialNB()
+X = None
 data = None
 batch_size = 1500
 
@@ -36,33 +37,29 @@ def removeNonAlphabets(s):
     s = regex.sub('', s)   
     return s
 
-def vectorizeDstream(rdd):
-    global data, X
+# def vectorizeDstream(rdd):
+#     global data
+#     global X
 
-    l = rdd.collect()
+#     l = rdd.collect()
 
-    if len(l):
-        if data is None:
-            # Data is a list of strings
-            data = []
+#     if len(l):
+#         if data is None:
+#             # Data is a list of strings
+#             data = []
         
-        # Create dataframe for rdd
-        df = spark.createDataFrame(json.loads(rdd.collect()[0]).values(), schema)
-        
+#         # Create dataframe for rdd
+#         df = spark.createDataFrame(json.loads(rdd.collect()[0]).values(), schema)        
 
-        for x in df.collect():
-            data.append(removeNonAlphabets(x['feature0'] + ' ' + x['feature1']))
-        
+#         for x in df.collect():
+#             data.append(removeNonAlphabets(x['feature0'] + ' ' + x['feature1']))
 
+#         if len(data) == batch_size:
+#             # CountVectorize data
+#             X = vectorizer.fit_transform(np.array(data)).toarray
 
-        if len(data) == batch_size:
-            # CountVectorize data
-            X = vectorizer.partial_fit(np.array(data)).toarray()
-
-            # Reinitialize data
-            data = None
-        
-        return None
+#             # Reinitialize data
+#             data = None
 
 def func(rdd):
     global X
@@ -78,7 +75,7 @@ def func(rdd):
 
         df_list = df.collect()
 
-        # X = vectorizer.fit_transform(np.array([x['feature1']  for x in df_list]))
+        X = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
 
         y = le.fit_transform(np.array([x['feature2']  for x in df_list]))
 
@@ -104,7 +101,7 @@ def func(rdd):
 
 lines = ssc.socketTextStream("localhost", 6100)
 
-lines.foreachRDD(vectorizeDstream)
+# lines.foreachRDD(vectorizeDstream)
 lines.foreachRDD(func)
 
 ssc.start()
