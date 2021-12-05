@@ -37,7 +37,7 @@ def removeNonAlphabets(s):
     return s
 
 def vectorizeDstream(rdd):
-    global data
+    global data, X
 
     l = rdd.collect()
 
@@ -56,15 +56,11 @@ def vectorizeDstream(rdd):
 
 
         if len(data) == batch_size:
-            print(type(data[-1]))
             # CountVectorize data
             X = vectorizer.fit_transform(np.array(data)).toarray()
 
             # Reinitialize data
             data = None
-
-            # Return vectorized output
-            return X
         
         return None
 
@@ -84,32 +80,32 @@ def func(rdd):
 
         # X = vectorizer.fit_transform(np.array([x['feature1']  for x in df_list]))
 
-        # y = le.fit_transform(np.array([x['feature2']  for x in df_list]))
+        y = le.fit_transform(np.array([x['feature2']  for x in df_list]))
 
         print("X:", X.shape)
-        # print("y:", y.shape)
+        print("y:", y.shape)
 
-        # X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state = 9)
+        X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state = 9)
 
-        # model = mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
-        # pred = model.predict(X_test)
+        model = mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
+        pred = model.predict(X_test)
 
-        # accuracy = accuracy_score(y_test, pred)
-        # precision = precision_score(y_test, pred)
-        # recall = recall_score(y_test, pred)
-        # conf_m = confusion_matrix(y_test, pred)
+        accuracy = accuracy_score(y_test, pred)
+        precision = precision_score(y_test, pred)
+        recall = recall_score(y_test, pred)
+        conf_m = confusion_matrix(y_test, pred)
 
-        # print(f"accuracy: %.3f" %accuracy)
-        # print(f"precision: %.3f" %precision)
-        # print(f"recall: %.3f" %recall)
-        # print(f"confusion matrix: ")
-        # print(conf_m)
+        print(f"accuracy: %.3f" %accuracy)
+        print(f"precision: %.3f" %precision)
+        print(f"recall: %.3f" %recall)
+        print(f"confusion matrix: ")
+        print(conf_m)
 
 
 lines = ssc.socketTextStream("localhost", 6100)
 
-X = lines.foreachRDD(vectorizeDstream)
-# lines.foreachRDD(func)
+lines.foreachRDD(vectorizeDstream)
+lines.foreachRDD(func)
 
 ssc.start()
 ssc.awaitTermination()
