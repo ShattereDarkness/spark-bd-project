@@ -26,6 +26,7 @@ schema = StructType([StructField("feature0", StringType(), True), StructField("f
 
 vectorizer = CountVectorizer()
 le = LabelEncoder()
+mnb = MultinomialNB()
 
 def removeNonAlphabets(s):
     s.lower()
@@ -48,7 +49,7 @@ def func(rdd):
 
         X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state=9, test_size=0.2)
 
-        model = MultinomialNB().partial_fit(X_train, y_train)
+        model = mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
         pred = model.predict(X_test)
 
         accuracy = accuracy_score(y_test, pred)
