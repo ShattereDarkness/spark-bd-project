@@ -2,13 +2,12 @@ from pyspark.context import SparkContext
 from pyspark.streaming import StreamingContext
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType
-from pyspark.sql.functions import col, udf, struct
-from pyspark.ml.feature import Tokenizer, StopWordsRemover, StringIndexer
-from pyspark.ml import Pipeline
+from pyspark.sql.functions import udf
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.preprocessing import LabelEncoder
 import json
 import re
+import numpy as np
 
 
 # Initialize the spark context.
@@ -18,6 +17,9 @@ ssc = StreamingContext(sc, 5)
 spark = SparkSession(sc)
 
 schema = StructType([StructField("feature0", StringType(), True), StructField("feature1", StringType(), True), StructField("feature2", StringType(), True)])
+
+vectorizer = CountVectorizer()
+le = LabelEncoder()
 
 def removeNonAlphabets(s):
     s.lower()
@@ -31,31 +33,14 @@ def func(rdd):
     if len(l):
         df = spark.createDataFrame(json.loads(rdd.collect()[0]).values(), schema)
 
-        remove_alpha = udf(removeNonAlphabets, StringType())
-        new_df_0 = df.withColumn("feature0", remove_alpha(df["feature0"]))
-        new_df_1 = new_df_0.withColumn("feature1", remove_alpha(new_df_0["feature1"]))
-        new_df_1.show()
-        
-        # tokenizer = Tokenizer(inputCol="feature0", outputCol="words") 
+        remove_non_alpha = udf(removeNonAlphabets, StringType())
+        new_df_0 = df.withColumn("feature0", remove_non_alpha(df["feature0"]))
+        new_df_1 = new_df_0.withColumn("feature1", remove_non_alpha(new_df_0["feature1"]))
 
-        # stopremove = StopWordsRemover(inputCol='words',outputCol='stop_tokens')
+        X = vectorizer.fit_transform(np.array(new_df_1.select(['feature1']).rdd.map(lambda r: r[0]).collect())).toarray()
+        y = le.fit_transform(np.array(new_df_1.select('feature2').rdd.map(lambda r: r[0]).collect()))
 
-        # data_prep_pipe = Pipeline(stages=[tokenizer, stopremove])
-        # cleaner = data_prep_pipe.fit(df)
-        # clean_data = cleaner.transform(df)
-
-        # df.select('feature0').show()
-        # new_data = df.collect() #[[]]
-        # l = []
-        # for row in new_data:
-        #     l.append(row['feature0']) #['sayo', 'sucks']
-
-        # vectorizer = CountVectorizer()
-        # X = vectorizer.fit_transform(l)
-        # X_arr =  X.toarray()
-
-        # le = LabelEncoder()
-        # le.fit(df.rdd.collect()['feature2'])
+        print(X, y)
 
 
 lines = ssc.socketTextStream("localhost", 6100)
