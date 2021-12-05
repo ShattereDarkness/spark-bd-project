@@ -12,15 +12,16 @@ import re
 
 
 # Initialize the spark context.
-sc = SparkContext(appName="ScamStreaming")
+sc = SparkContext(appName="SpamStreaming")
 ssc = StreamingContext(sc, 5)
 
 spark = SparkSession(sc)
 
 schema = StructType([StructField("feature0", StringType(), True), StructField("feature1", StringType(), True), StructField("feature2", StringType(), True)])
 
-def removeNonAlphaNumeric(s):
-    regex = re.compile('[^a-zA-Z\s]')
+def removeNonAlphabets(s):
+    s.lower()
+    regex = re.compile('[^a-z\s]')
     s = regex.sub('', s)   
     return s
 
@@ -30,11 +31,10 @@ def func(rdd):
     if len(l):
         df = spark.createDataFrame(json.loads(rdd.collect()[0]).values(), schema)
 
-        remove_alpha = udf(removeNonAlphaNumeric, StringType())
-        new_df = df.withColumn("feature0", remove_alpha(df["feature0"]))
-        new_df.select('feature0').show()
-
-        # df.show()
+        remove_alpha = udf(removeNonAlphabets, StringType())
+        new_df_0 = df.withColumn("feature0", remove_alpha(df["feature0"]))
+        new_df_1 = new_df_0.withColumn("feature1", remove_alpha(new_df_0["feature1"]))
+        new_df_1.show()
         
         # tokenizer = Tokenizer(inputCol="feature0", outputCol="words") 
 
@@ -55,7 +55,7 @@ def func(rdd):
         # X_arr =  X.toarray()
 
         # le = LabelEncoder()
-        # y = le.fit(new_data["feature2"])
+        # le.fit(df.rdd.collect()['feature2'])
 
 
 lines = ssc.socketTextStream("localhost", 6100)
