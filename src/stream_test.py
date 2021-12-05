@@ -5,9 +5,10 @@ from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql.functions import udf
 
 from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import CountVectorizer, HashingVectorizer
+from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.preprocessing import LabelEncoder
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import MultinomialNB, GaussianNB
+from sklearn.linear_model import Perceptron
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.metrics import confusion_matrix
 
@@ -27,6 +28,8 @@ schema = StructType([StructField("feature0", StringType(), True), StructField("f
 vectorizer = HashingVectorizer(alternate_sign=False)
 le = LabelEncoder()
 mnb = MultinomialNB()
+gnb = GaussianNB()
+per = Perceptron()
 X = None
 data = None
 batch_size = 1500
@@ -37,30 +40,6 @@ def removeNonAlphabets(s):
     s = regex.sub('', s)   
     return s
 
-# def vectorizeDstream(rdd):
-#     global data
-#     global X
-
-#     l = rdd.collect()
-
-#     if len(l):
-#         if data is None:
-#             # Data is a list of strings
-#             data = []
-        
-#         # Create dataframe for rdd
-#         df = spark.createDataFrame(json.loads(rdd.collect()[0]).values(), schema)        
-
-#         for x in df.collect():
-#             data.append(removeNonAlphabets(x['feature0'] + ' ' + x['feature1']))
-
-#         if len(data) == batch_size:
-#             # CountVectorize data
-#             X = vectorizer.fit_transform(np.array(data)).toarray
-
-#             # Reinitialize data
-#             data = None
-
 def func(rdd):
     global X
 
@@ -69,21 +48,15 @@ def func(rdd):
     if len(l):
         df = spark.createDataFrame(json.loads(l[0]).values(), schema)
 
-        # remove_non_alpha = udf(removeNonAlphabets, StringType())
-        # new_df_0 = df.withColumn("feature0", remove_non_alpha(df["feature0"]))
-        # new_df_1 = new_df_0.withColumn("feature1", remove_non_alpha(new_df_0["feature1"]))
-
         df_list = df.collect()
 
         X = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
 
         y = le.fit_transform(np.array([x['feature2']  for x in df_list]))
 
-        print("X:", X.shape)
-        print("y:", y.shape)
-
         X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state = 9)
 
+        #multinomial nb
         model = mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
         pred = model.predict(X_test)
 
@@ -98,10 +71,38 @@ def func(rdd):
         print(f"confusion matrix: ")
         print(conf_m)
 
+        # #gaussiannb
+        # model = gnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
+        # pred = model.predict(X_test)
+
+        # accuracy = accuracy_score(y_test, pred)
+        # precision = precision_score(y_test, pred)
+        # recall = recall_score(y_test, pred)
+        # conf_m = confusion_matrix(y_test, pred)
+
+        # print(f"accuracy: %.3f" %accuracy)
+        # print(f"precision: %.3f" %precision)
+        # print(f"recall: %.3f" %recall)
+        # print(f"confusion matrix: ")
+        # print(conf_m)
+
+        # #perceptron
+        # model = per.partial_fit(X_train, y_train, classes = np.unique(y_train))
+        # pred = model.predict(X_test)
+
+        # accuracy = accuracy_score(y_test, pred)
+        # precision = precision_score(y_test, pred)
+        # recall = recall_score(y_test, pred)
+        # conf_m = confusion_matrix(y_test, pred)
+
+        # print(f"accuracy: %.3f" %accuracy)
+        # print(f"precision: %.3f" %precision)
+        # print(f"recall: %.3f" %recall)
+        # print(f"confusion matrix: ")
+        # print(conf_m)
+
 
 lines = ssc.socketTextStream("localhost", 6100)
-
-# lines.foreachRDD(vectorizeDstream)
 lines.foreachRDD(func)
 
 ssc.start()
