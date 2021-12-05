@@ -3,8 +3,14 @@ from pyspark.streaming import StreamingContext
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql.functions import udf
+
+from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.preprocessing import LabelEncoder
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, precision_score, recall_score
+from sklearn.metrics import confusion_matrix
+
 import json
 import re
 import numpy as np
@@ -40,7 +46,21 @@ def func(rdd):
         X = vectorizer.fit_transform(np.array(new_df_1.select(['feature1']).rdd.map(lambda r: r[0]).collect())).toarray()
         y = le.fit_transform(np.array(new_df_1.select('feature2').rdd.map(lambda r: r[0]).collect()))
 
-        print(X, y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state=9, test_size=0.2)
+
+        model = MultinomialNB().partial_fit(X_train, y_train)
+        pred = model.predict(X_test)
+
+        accuracy = accuracy_score(y_test, pred)
+        precision = precision_score(y_test, pred)
+        recall = recall_score(y_test, pred)
+        conf_m = confusion_matrix(y_test, pred)
+
+        print(f"accuracy: %.3f" %accuracy)
+        print(f"precision: %.3f" %precision)
+        print(f"recall: %.3f" %recall)
+        print(f"confusion matrix: ")
+        print(conf_m)
 
 
 lines = ssc.socketTextStream("localhost", 6100)
