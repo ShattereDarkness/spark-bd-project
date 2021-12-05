@@ -5,7 +5,7 @@ from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql.functions import udf
 
 from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, HashingVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score, precision_score, recall_score
@@ -24,7 +24,7 @@ spark = SparkSession(sc)
 
 schema = StructType([StructField("feature0", StringType(), True), StructField("feature1", StringType(), True), StructField("feature2", StringType(), True)])
 
-vectorizer = CountVectorizer()
+vectorizer = HashingVectorizer()
 le = LabelEncoder()
 mnb = MultinomialNB()
 data = None
@@ -57,7 +57,7 @@ def vectorizeDstream(rdd):
 
         if len(data) == batch_size:
             # CountVectorize data
-            X = vectorizer.fit_transform(np.array(data)).toarray()
+            X = vectorizer.partial_fit(np.array(data)).toarray()
 
             # Reinitialize data
             data = None
