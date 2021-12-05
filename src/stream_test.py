@@ -38,37 +38,56 @@ def removeNonAlphabets(s):
 
 def vectorizeDstream(rdd):
     global data
-    if data is None:
-        data = []
-    
-    data.append(rdd.map(lambda x: x[1]).collect())
-    print(data[-1])
 
-    if len(data) == batch_size:
-        print('\n\nDONE\n\n')
-        data = None  
-
-def func(rdd):
     l = rdd.collect()
 
     if len(l):
+        if data is None:
+            # Data is a list of strings
+            data = []
+        
+        # Create dataframe for rdd
         df = spark.createDataFrame(json.loads(rdd.collect()[0]).values(), schema)
+        
 
-        remove_non_alpha = udf(removeNonAlphabets, StringType())
-        new_df_0 = df.withColumn("feature0", remove_non_alpha(df["feature0"]))
-        new_df_1 = new_df_0.withColumn("feature1", remove_non_alpha(new_df_0["feature1"]))
+        for x in df.collect():
+            data.append(removeNonAlphabets(x['feature0'] + ' ' + x['feature1']))
+        
 
-        df_list = new_df_1.collect()
-        temp = np.array(new_df_1.collect())
-        print(temp.shape)
-        temp1 = np.array([x['feature1']  for x in df_list])
-        print(temp1.shape)
 
-        X = vectorizer.fit_transform(np.array([x['feature1']  for x in df_list]))
-        y = le.fit_transform(np.array([x['feature2']  for x in df_list]))
+        if len(data) == batch_size:
+            print(type(data[-1]))
+            # CountVectorize data
+            X = vectorizer.fit_transform(np.array(data)).toarray()
+
+            # Reinitialize data
+            data = None
+
+            # Return vectorized output
+            return X
+        
+        return None
+
+def func(rdd):
+    global X
+
+    l = rdd.collect()
+
+    if len(l):
+        df = spark.createDataFrame(json.loads(l[0]).values(), schema)
+
+        # remove_non_alpha = udf(removeNonAlphabets, StringType())
+        # new_df_0 = df.withColumn("feature0", remove_non_alpha(df["feature0"]))
+        # new_df_1 = new_df_0.withColumn("feature1", remove_non_alpha(new_df_0["feature1"]))
+
+        df_list = df.collect()
+
+        # X = vectorizer.fit_transform(np.array([x['feature1']  for x in df_list]))
+
+        # y = le.fit_transform(np.array([x['feature2']  for x in df_list]))
 
         print("X:", X.shape)
-        print("y:", y.shape)
+        # print("y:", y.shape)
 
         # X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state = 9)
 
@@ -88,9 +107,9 @@ def func(rdd):
 
 
 lines = ssc.socketTextStream("localhost", 6100)
-data = None
-lines.foreachRDD(vectorizeDstream)
-lines.foreachRDD(func)
+
+X = lines.foreachRDD(vectorizeDstream)
+# lines.foreachRDD(func)
 
 ssc.start()
 ssc.awaitTermination()
