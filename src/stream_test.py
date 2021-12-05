@@ -27,12 +27,26 @@ schema = StructType([StructField("feature0", StringType(), True), StructField("f
 vectorizer = CountVectorizer()
 le = LabelEncoder()
 mnb = MultinomialNB()
+data = None
+batch_size = 1500
 
 def removeNonAlphabets(s):
     s.lower()
     regex = re.compile('[^a-z\s]')
     s = regex.sub('', s)   
     return s
+
+def vectorizeDstream(rdd):
+    global data
+    if data is None:
+        data = []
+    
+    data.append(rdd.map(lambda x: x[1]).collect())
+    print(data[-1])
+
+    if len(data) == batch_size:
+        print('\n\nDONE\n\n')
+        data = None  
 
 def func(rdd):
     l = rdd.collect()
@@ -50,28 +64,32 @@ def func(rdd):
         temp1 = np.array([x['feature1']  for x in df_list])
         print(temp1.shape)
 
-        X = vectorizer.fit_transform(np.array([x['feature1']  for x in df_list]))#.toarray()
+        X = vectorizer.fit_transform(np.array([x['feature1']  for x in df_list]))
         y = le.fit_transform(np.array([x['feature2']  for x in df_list]))
 
         print("X:", X.shape)
-        X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state = 9)
+        print("y:", y.shape)
 
-        model = mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
-        pred = model.predict(X_test)
+        # X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state = 9)
 
-        accuracy = accuracy_score(y_test, pred)
-        precision = precision_score(y_test, pred)
-        recall = recall_score(y_test, pred)
-        conf_m = confusion_matrix(y_test, pred)
+        # model = mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
+        # pred = model.predict(X_test)
 
-        print(f"accuracy: %.3f" %accuracy)
-        print(f"precision: %.3f" %precision)
-        print(f"recall: %.3f" %recall)
-        print(f"confusion matrix: ")
-        print(conf_m)
+        # accuracy = accuracy_score(y_test, pred)
+        # precision = precision_score(y_test, pred)
+        # recall = recall_score(y_test, pred)
+        # conf_m = confusion_matrix(y_test, pred)
+
+        # print(f"accuracy: %.3f" %accuracy)
+        # print(f"precision: %.3f" %precision)
+        # print(f"recall: %.3f" %recall)
+        # print(f"confusion matrix: ")
+        # print(conf_m)
 
 
 lines = ssc.socketTextStream("localhost", 6100)
+data = None
+lines.foreachRDD(vectorizeDstream)
 lines.foreachRDD(func)
 
 ssc.start()
