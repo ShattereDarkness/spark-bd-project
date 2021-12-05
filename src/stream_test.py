@@ -44,10 +44,17 @@ def func(rdd):
         new_df_0 = df.withColumn("feature0", remove_non_alpha(df["feature0"]))
         new_df_1 = new_df_0.withColumn("feature1", remove_non_alpha(new_df_0["feature1"]))
 
-        X = vectorizer.fit_transform(np.array(new_df_1.select(['feature1']).rdd.map(lambda r: r[0]).collect())).toarray()
-        y = le.fit_transform(np.array(new_df_1.select('feature2').rdd.map(lambda r: r[0]).collect()))
+        df_list = new_df_1.collect()
+        temp = np.array(new_df_1.collect())
+        print(temp.shape)
+        temp1 = np.array([x['feature1']  for x in df_list])
+        print(temp1.shape)
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state=9, test_size=0.2)
+        X = vectorizer.fit_transform(np.array([x['feature1']  for x in df_list]))#.toarray()
+        y = le.fit_transform(np.array([x['feature2']  for x in df_list]))
+
+        print("X:", X.shape)
+        X_train, X_test, y_train, y_test = train_test_split(X, y,  random_state = 9)
 
         model = mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
         pred = model.predict(X_test)
