@@ -10,7 +10,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import Perceptron, SGDClassifier
 from sklearn.cluster import MiniBatchKMeans
-from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, f1_score, classification_report
 
 import json
 import re
@@ -46,6 +46,8 @@ def removeNonAlphabets(s):
 
 def print_stats(y, pred):
 
+    # global classes
+
     accuracy = accuracy_score(y, pred)
     precision = precision_score(y, pred)
     recall = recall_score(y, pred)
@@ -58,6 +60,8 @@ def print_stats(y, pred):
     print(f"f1-score : %.3f" %f1)
     print(f"confusion matrix: ")
     print(conf_m)
+
+    print(classification_report(y, pred, classes = classes))
 
 def func(rdd):
     global N
@@ -88,8 +92,6 @@ def func(rdd):
 
             #k means clustering
             kmeans.partial_fit(X_train, y_train)
-            N += 1
-            print(N)
             
         else:
             X_test = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
