@@ -56,7 +56,7 @@ def print_stats(y, pred):
     print(f"confusion matrix: ")
     print(conf_m)
 
-def train_func(rdd):
+def func(rdd):
     global N
     global classes
     l = rdd.collect()
@@ -66,67 +66,62 @@ def train_func(rdd):
 
         df_list = df.collect()
 
-        X_train = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
+        if N < 30:
+            X_train = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
 
-        y_train = le.fit_transform(np.array([x['feature2']  for x in df_list]))
-        
-        if N == 0:
-            classes = np.unique(y_train)
+            y_train = le.fit_transform(np.array([x['feature2']  for x in df_list]))
+            
+            if N == 0:
+                classes = np.unique(y_train)
 
-        #multinomial nb
-        mnb.partial_fit(X_train, y_train, classes = classes)
+            #multinomial nb
+            mnb.partial_fit(X_train, y_train, classes = classes)
 
-        #perceptron
-        per.partial_fit(X_train, y_train, classes = classes)
+            #perceptron
+            per.partial_fit(X_train, y_train, classes = classes)
 
-        #sgdclassifier
-        sgd.partial_fit(X_train, y_train, classes = classes)
+            #sgdclassifier
+            sgd.partial_fit(X_train, y_train, classes = classes)
 
-        #k means clustering
-        kmeans.partial_fit(X_train, y_train)
-        N += 1
-        print(N)
+            #k means clustering
+            kmeans.partial_fit(X_train, y_train)
+            N += 1
+            print(N)
 
 
-def test_func(rdd):
-    global N
-    l = rdd.collect()
+# def test_func(rdd):
+#     global N
+#     l = rdd.collect()
 
-    if len(l):
-        df = spark.createDataFrame(json.loads(l[0]).values(), schema)
+#     if len(l):
+        else:
+            X_test = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
 
-        df_list = df.collect()
+            y_test = le.fit_transform(np.array([x['feature2']  for x in df_list]))
 
-        X_test = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
+            #multinomial nb
+            pred = mnb.predict(X_test)
+            print_stats(y_test, pred)
 
-        y_test = le.fit_transform(np.array([x['feature2']  for x in df_list]))
+            #perceptron
+            pred = per.predict(X_test)
+            print_stats(y_test, pred)
 
-        #multinomial nb
-        pred = mnb.predict(X_test)
-        print_stats(y_test, pred)
+            #sgdclassifier
+            pred = sgd.predict(X_test)
+            print_stats(y_test, pred)
 
-        #perceptron
-        pred = per.predict(X_test)
-        print_stats(y_test, pred)
+            #k means clustering
+            pred = kmeans.predict(X_test)
+            print_stats(y_test, pred)
 
-        #sgdclassifier
-        pred = sgd.predict(X_test)
-        print_stats(y_test, pred)
-
-        #k means clustering
-        pred = kmeans.predict(X_test)
-        print_stats(y_test, pred)
-
-        N += 1
-        print(N)
+            N += 1
+            print(N)
 
 
 lines = ssc.socketTextStream("localhost", 6100)
 
-if N < 30:
-    lines.foreachRDD(train_func)
-else:
-    lines.foreachRDD(test_func)
+lines.foreachRDD(func)
 
 ssc.start()
 ssc.awaitTermination()
