@@ -10,8 +10,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import Perceptron, SGDClassifier
 from sklearn.cluster import MiniBatchKMeans
-from sklearn.metrics import accuracy_score, precision_score, recall_score
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, f1_score
 
 import json
 import re
@@ -29,21 +28,62 @@ schema = StructType([StructField("feature0", StringType(), True), StructField("f
 vectorizer = HashingVectorizer(alternate_sign=False)
 le = LabelEncoder()
 mnb = MultinomialNB()
-sgd = SGDClassifier()
-per = Perceptron()
+sgd = SGDClassifier(warm_start=True)
+per = Perceptron(warm_start=True)
 kmeans = MiniBatchKMeans(n_clusters=2)
-X = None
-data = None
-batch_size = 1500
+N = 0
+
 
 def removeNonAlphabets(s):
+
     s.lower()
     regex = re.compile('[^a-z\s]')
     s = regex.sub('', s)   
     return s
 
-def func(rdd):
-    global X
+def print_stats(y, pred):
+
+    accuracy = accuracy_score(y, pred)
+    precision = precision_score(y, pred)
+    recall = recall_score(y, pred)
+    conf_m = confusion_matrix(y, pred)
+    f1 = f1_score(y, pred)
+
+    print(f"\naccuracy: %.3f" %accuracy)
+    print(f"precision: %.3f" %precision)
+    print(f"recall: %.3f" %recall)
+    print(f"f1-score : %.3f" %f1)
+    print(f"confusion matrix: ")
+    print(conf_m)
+
+def train_func(rdd):
+    global N
+    l = rdd.collect()
+
+    if len(l):
+        df = spark.createDataFrame(json.loads(l[0]).values(), schema)
+
+        df_list = df.collect()
+
+        X_train = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
+
+        y_train = le.fit_transform(np.array([x['feature2']  for x in df_list]))
+        
+        #multinomial nb
+        mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
+
+        #perceptron
+        per.partial_fit(X_train, y_train, classes = np.unique(y_train))
+
+        #sgdclassifier
+        sgd.partial_fit(X_train, y_train, classes = np.unique(y_train))
+
+        #k means clustering
+        kmeans.partial_fit(X_train, y_train)
+        N += 1
+
+
+def test_func(rdd):
 
     l = rdd.collect()
 
@@ -52,74 +92,35 @@ def func(rdd):
 
         df_list = df.collect()
 
-        X = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
+        X_test = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
 
-        y = le.fit_transform(np.array([x['feature2']  for x in df_list]))
-
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.3, random_state = 9)
+        y_test = le.fit_transform(np.array([x['feature2']  for x in df_list]))
 
         #multinomial nb
-        model = mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
-        pred = model.predict(X_test)
-
-        accuracy = accuracy_score(y_test, pred)
-        precision = precision_score(y_test, pred)
-        recall = recall_score(y_test, pred)
-        conf_m = confusion_matrix(y_test, pred)
-
-        print(f"\nmulti : accuracy: %.3f" %accuracy)
-        print(f"precision: %.3f" %precision)
-        print(f"recall: %.3f" %recall)
-        print(f"confusion matrix: ")
-        print(conf_m)
+        pred = mnb.predict(X_test)
+        print_stats(y_test, pred)
 
         #perceptron
-        model = per.partial_fit(X_train, y_train, classes = np.unique(y_train))
-        pred = model.predict(X_test)
+        pred = per.predict(X_test)
+        print_stats(y_test, pred)
 
-        accuracy = accuracy_score(y_test, pred)
-        precision = precision_score(y_test, pred)
-        recall = recall_score(y_test, pred)
-        conf_m = confusion_matrix(y_test, pred)
-
-        print(f"\nperceptron : accuracy: %.3f" %accuracy)
-        print(f"precision: %.3f" %precision)
-        print(f"recall: %.3f" %recall)
-        print(f"confusion matrix: ")
-        print(conf_m)
-
-        # sgdclassifier
-        model = sgd.partial_fit(X_train, y_train, classes = np.unique(y_train))
-        pred = model.predict(X_test)
-
-        accuracy = accuracy_score(y_test, pred)
-        precision = precision_score(y_test, pred)
-        recall = recall_score(y_test, pred)
-        conf_m = confusion_matrix(y_test, pred)
-
-        print(f"\nsgd : accuracy: %.3f" %accuracy)
-        print(f"precision: %.3f" %precision)
-        print(f"recall: %.3f" %recall)
-        print(f"confusion matrix: ")
-        print(conf_m)
+        #sgdclassifier
+        pred = sgd.predict(X_test)
+        print_stats(y_test, pred)
 
         #k means clustering
-        model = kmeans.partial_fit(X_train, y_train)
-        pred = model.predict(X_test)
+        pred = kmeans.predict(X_test)
+        print_stats(y_test, pred)
 
-        accuracy = accuracy_score(y_test, pred)
-        precision = precision_score(y_test, pred)
-        recall = recall_score(y_test, pred)
-        conf_m = confusion_matrix(y_test, pred)
-
-        print(f"\nk-means : accuracy: %.3f" %accuracy)
-        print(f"precision: %.3f" %precision)
-        print(f"recall: %.3f" %recall)
-        print(f"confusion matrix: ")
-        print(conf_m)
 
 lines = ssc.socketTextStream("localhost", 6100)
-lines.foreachRDD(func)
+
+if N <= 30:
+    lines.foreachRDD(train_func)
+    print(N)
+else:
+    print(N)
+    lines.foreachRDD(test_func)
 
 ssc.start()
 ssc.awaitTermination()
