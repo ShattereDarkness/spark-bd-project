@@ -2,3 +2,4 @@ src/log.txt
 src/stream.py
 src/spam
 *.csv
+src/spam/test.csv
