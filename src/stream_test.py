@@ -47,10 +47,10 @@ args = parser.parse_args()
 count = 0
 TEST_SIZE = int(3373/args.batch_size)
 
-acc_clf1 = []
-acc_clf2 = []
-acc_clf3 = []
-acc_clf4 = []
+acc = [[] for i in range(4)]
+pre = [[] for i in range(4)]
+rec = [[] for i in range(4)]
+f1 = [[] for i in range(4)]
 
 mnb = load('mnb.pkl')
 per = load('per.pkl')
@@ -80,39 +80,31 @@ def removeStopWords(s):
     return res
 
 def print_stats(index, y, pred):
-    accuracy = accuracy_score(y, pred)
-    precision = precision_score(y, pred)
-    recall = recall_score(y, pred)
+    acc[index].append(accuracy_score(y, pred))
+    pre[index].append(precision_score(y, pred))
+    rec[index].append(recall_score(y, pred))
     conf_m = confusion_matrix(y, pred)
-    f1 = f1_score(y, pred)
+    f1[index].append(f1_score(y, pred))
 
-    print(f"\naccuracy: %.3f" %accuracy)
-    # print(f"precision: %.3f" %precision[-1])
-    # print(f"recall: %.3f" %recall[-1])
-    # print(f"f1-score : %.3f" %f1[-1])
+    # print(f"\naccuracy: %.3f" %acc[index][-1])
+    # print(f"precision: %.3f" %pre[index][-1])
+    # print(f"recall: %.3f" %rec[index][-1])
+    # print(f"f1-score : %.3f" %f1[index][-1])
     print(f"confusion matrix: ")
     print(conf_m)
 
-    if index == 1:
-        acc_clf1.append(accuracy)
-    elif index==2:
-        acc_clf2.append(accuracy)
-    elif index==3:
-        acc_clf3.append(accuracy)
-    elif index==4:
-        acc_clf4.append(accuracy)
+    print(classification_report(y, pred, labels = [0, 1]))
 
-    # print(classification_report(y, pred, labels = [0, 1]))
-
-def plotting():
+def plotting(arr, str):
     x_axis = [i for i in range(1, TEST_SIZE + 1)]
-    print(acc_clf1)
-    plt.plot(x_axis, acc_clf1, color = "red")  
-    plt.plot(x_axis, acc_clf2, color = "blue") 
-    plt.plot(x_axis, acc_clf3, color = "green") 
-    plt.plot(x_axis, acc_clf4, color = "black") 
-    plt.ylabel("Accuracy")     
-    plt.xlabel("Num Of Batches")     
+    plt.plot(x_axis, arr[0], label='MultinomialNB')  
+    plt.plot(x_axis, arr[1], label='Perceptron') 
+    plt.plot(x_axis, arr[2], label='SGD-classifier') 
+    plt.plot(x_axis, arr[3], label='K-means') 
+    plt.ylabel(str)     
+    plt.xlabel("Num Of Batches")    
+    plt.title(str) 
+    plt.legend()
     plt.show()
 
 def func(rdd):
@@ -139,25 +131,28 @@ def func(rdd):
         #multinomial nb
         pred = mnb.predict(X_test)
         print("\nMultinomial NB: ")
-        print_stats(1, y_test, pred)
+        print_stats(0, y_test, pred)
 
         #perceptron
         pred = per.predict(X_test)
         print("\nPerceptron: ")
-        print_stats(2, y_test, pred)
+        print_stats(1, y_test, pred)
 
         #sgdclassifier
         pred = sgd.predict(X_test)
         print("\nSGD Classifier: ")
-        print_stats(3, y_test, pred)
+        print_stats(2, y_test, pred)
 
         #k means clustering
         pred = kmeans.predict(X_test)
         print("\nK-Means: ")
-        print_stats(4, y_test, pred)
+        print_stats(3, y_test, pred)
     
     if count == TEST_SIZE:
-        plotting()
+        plotting(acc, "Accuracy")
+        plotting(pre, "Precision")
+        plotting(rec, "Recall")
+        plotting(f1, "F1")
         count = 0
 
 
