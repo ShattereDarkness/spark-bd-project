@@ -13,9 +13,7 @@ from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, f1_score, classification_report
 from sklearn.feature_extraction import text
 
-from joblib import load
-
-import matplotlib.pyplot as plt
+from joblib import dump
 
 import json
 import re
@@ -44,19 +42,6 @@ kmeans = MiniBatchKMeans(n_clusters=2)
 
 args = parser.parse_args()
 
-count = 0
-TEST_SIZE = int(3373/args.batch_size)
-
-acc_clf1 = []
-acc_clf2 = []
-acc_clf3 = []
-acc_clf4 = []
-
-mnb = load('mnb.pkl')
-per = load('per.pkl')
-sgd = load('sgd.pkl')
-kmeans = load('kmeans.pkl')
-
 def removeNonAlphabets(s):
     s.lower()
     regex = re.compile('[^a-z\s]')
@@ -79,49 +64,11 @@ def removeStopWords(s):
     
     return res
 
-def print_stats(index, y, pred):
-    accuracy = accuracy_score(y, pred)
-    precision = precision_score(y, pred)
-    recall = recall_score(y, pred)
-    conf_m = confusion_matrix(y, pred)
-    f1 = f1_score(y, pred)
-
-    print(f"\naccuracy: %.3f" %accuracy)
-    # print(f"precision: %.3f" %precision[-1])
-    # print(f"recall: %.3f" %recall[-1])
-    # print(f"f1-score : %.3f" %f1[-1])
-    print(f"confusion matrix: ")
-    print(conf_m)
-
-    if index == 1:
-        acc_clf1.append(accuracy)
-    elif index==2:
-        acc_clf2.append(accuracy)
-    elif index==3:
-        acc_clf3.append(accuracy)
-    elif index==4:
-        acc_clf4.append(accuracy)
-
-    # print(classification_report(y, pred, labels = [0, 1]))
-
-def plotting():
-    x_axis = [i for i in range(1, TEST_SIZE + 1)]
-    print(acc_clf1)
-    plt.plot(x_axis, acc_clf1, color = "red")  
-    plt.plot(x_axis, acc_clf2, color = "blue") 
-    plt.plot(x_axis, acc_clf3, color = "green") 
-    plt.plot(x_axis, acc_clf4, color = "black") 
-    plt.ylabel("Accuracy")     
-    plt.xlabel("Num Of Batches")     
-    plt.show()
-
 def func(rdd):
-    global count, TEST_SIZE
+
     l = rdd.collect()
 
-    if len(l):  
-        count += 1
-
+    if len(l):
         df = spark.createDataFrame(json.loads(l[0]).values(), schema)
 
         df_list = df.collect()
@@ -132,33 +79,26 @@ def func(rdd):
         # Remove stop words
         no_stop_words = removeStopWords(non_alphabetic)
 
-        X_test = vectorizer.fit_transform(no_stop_words)
+        X_train = vectorizer.fit_transform(no_stop_words)
 
-        y_test = le.fit_transform(np.array([x['feature2']  for x in df_list]))
+        y_train = le.fit_transform(np.array([x['feature2']  for x in df_list]))
 
         #multinomial nb
-        pred = mnb.predict(X_test)
-        print("\nMultinomial NB: ")
-        print_stats(1, y_test, pred)
+        mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
 
         #perceptron
-        pred = per.predict(X_test)
-        print("\nPerceptron: ")
-        print_stats(2, y_test, pred)
+        per.partial_fit(X_train, y_train, classes = np.unique(y_train))
 
         #sgdclassifier
-        pred = sgd.predict(X_test)
-        print("\nSGD Classifier: ")
-        print_stats(3, y_test, pred)
+        sgd.partial_fit(X_train, y_train, classes = np.unique(y_train))
 
         #k means clustering
-        pred = kmeans.predict(X_test)
-        print("\nK-Means: ")
-        print_stats(4, y_test, pred)
-    
-    if count == TEST_SIZE:
-        plotting()
-        count = 0
+        kmeans.partial_fit(X_train, y_train)
+
+        dump(mnb, 'mnb.pkl', compress=9)
+        dump(per, 'per.pkl', compress=9)
+        dump(sgd, 'sgd.pkl', compress=9)
+        dump(kmeans, 'kmeans.pkl', compress=9)
 
 
 lines = ssc.socketTextStream("localhost", 6100)
