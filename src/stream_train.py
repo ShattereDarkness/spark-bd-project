@@ -2,15 +2,12 @@ from pyspark.context import SparkContext
 from pyspark.streaming import StreamingContext
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType
-from pyspark.sql.functions import udf
 
-from sklearn.model_selection import learning_curve
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import Perceptron, SGDClassifier
 from sklearn.cluster import MiniBatchKMeans
-from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, f1_score, classification_report
 from sklearn.feature_extraction import text
 
 from joblib import dump
@@ -95,10 +92,10 @@ def func(rdd):
         #k means clustering
         kmeans.partial_fit(X_train, y_train)
 
-        dump(mnb, 'mnb.pkl', compress=9)
-        dump(per, 'per.pkl', compress=9)
-        dump(sgd, 'sgd.pkl', compress=9)
-        dump(kmeans, 'kmeans.pkl', compress=9)
+        dump(mnb, 'mnb' + str(args.batch_size) + '.pkl', compress=9)
+        dump(per, 'per' + str(args.batch_size) + '.pkl', compress=9)
+        dump(sgd, 'sgd' + str(args.batch_size) + '.pkl', compress=9)
+        dump(kmeans, 'kmeans' + str(args.batch_size) + '.pkl', compress=9)
 
 
 lines = ssc.socketTextStream("localhost", 6100)

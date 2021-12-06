@@ -2,9 +2,7 @@ from pyspark.context import SparkContext
 from pyspark.streaming import StreamingContext
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType
-from pyspark.sql.functions import udf
 
-from sklearn.model_selection import learning_curve
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.naive_bayes import MultinomialNB
@@ -52,10 +50,10 @@ pre = [[] for i in range(4)]
 rec = [[] for i in range(4)]
 f1 = [[] for i in range(4)]
 
-mnb = load('mnb.pkl')
-per = load('per.pkl')
-sgd = load('sgd.pkl')
-kmeans = load('kmeans.pkl')
+mnb = load('mnb' + str(args.batch_size) + '.pkl')
+per = load('per' + str(args.batch_size) + '.pkl')
+sgd = load('sgd' + str(args.batch_size) + '.pkl')
+kmeans = load('kmeans' + str(args.batch_size) + '.pkl')
 
 def removeNonAlphabets(s):
     s.lower()
