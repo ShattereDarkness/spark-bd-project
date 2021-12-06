@@ -16,6 +16,9 @@ import json
 import re
 import numpy as np
 
+TRAIN_SIZE = 20
+TEST_SIZE = 2
+BATCH_SIZE = TRAIN_SIZE + TEST_SIZE
 
 # Initialize the spark context.
 sc = SparkContext(appName="SpamStreaming")
@@ -66,7 +69,7 @@ def func(rdd):
 
         df_list = df.collect()
 
-        if N < 30:
+        if N < TRAIN_SIZE:
             X_train = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
 
             y_train = le.fit_transform(np.array([x['feature2']  for x in df_list]))
@@ -95,22 +98,28 @@ def func(rdd):
 
             #multinomial nb
             pred = mnb.predict(X_test)
+            print("\nMultinomial NB: ")
             print_stats(y_test, pred)
 
             #perceptron
             pred = per.predict(X_test)
+            print("\nPerceptron: ")
             print_stats(y_test, pred)
 
             #sgdclassifier
             pred = sgd.predict(X_test)
+            print("\nSGD Classifier: ")
             print_stats(y_test, pred)
 
             #k means clustering
             pred = kmeans.predict(X_test)
+            print("\nK-Means: ")
             print_stats(y_test, pred)
 
-            N += 1
-            print(N)
+        N += 1
+        
+        N = N % BATCH_SIZE
+
 
 
 lines = ssc.socketTextStream("localhost", 6100)
