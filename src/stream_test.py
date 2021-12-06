@@ -4,7 +4,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql.functions import udf
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import learning_curve
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.naive_bayes import MultinomialNB
@@ -15,10 +15,13 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, confu
 import json
 import re
 import numpy as np
+import time
+import argparse
 
-TRAIN_SIZE = 20
-TEST_SIZE = 2
-BATCH_SIZE = TRAIN_SIZE + TEST_SIZE
+parser = argparse.ArgumentParser(
+    description='Streams a file to a Spark Streaming Context')
+parser.add_argument('--batch-size', '-b', help='Batch size',
+                    required=False, type=int, default=100)
 
 # Initialize the spark context.
 sc = SparkContext(appName="SpamStreaming")
@@ -36,6 +39,13 @@ per = Perceptron(warm_start=True)
 kmeans = MiniBatchKMeans(n_clusters=2)
 N = 0
 classes = []
+d = dict()
+
+args = parser.parse_args()
+
+TRAIN_SIZE = int(30345/args.batch_size)
+TEST_SIZE = int(3373/args.batch_size)
+BATCH_SIZE = TRAIN_SIZE + TEST_SIZE
 
 def removeNonAlphabets(s):
 
@@ -61,11 +71,11 @@ def print_stats(y, pred):
     print(f"confusion matrix: ")
     print(conf_m)
 
-    print(classification_report(y, pred, classes = classes))
+    print(classification_report(y, pred, labels = classes))
 
 def func(rdd):
-    global N
-    global classes
+    global N, d, classes
+
     l = rdd.collect()
 
     if len(l):
@@ -78,20 +88,33 @@ def func(rdd):
 
             y_train = le.fit_transform(np.array([x['feature2']  for x in df_list]))
             
-            if N == 0:
+            if N == 0:                
+                print(args.batch_size)
                 classes = np.unique(y_train)
+                d['mnb'] = 0
+                d['per'] = 0
+                d['sgd'] = 0
+                d['kmeans'] = 0
 
             #multinomial nb
+            start_time = time.time()
             mnb.partial_fit(X_train, y_train, classes = classes)
+            d['mnb'] += time.time() - start_time
 
             #perceptron
+            start_time = time.time()
             per.partial_fit(X_train, y_train, classes = classes)
+            d['per'] += time.time() - start_time
 
             #sgdclassifier
+            start_time = time.time()
             sgd.partial_fit(X_train, y_train, classes = classes)
+            d['sgd'] += time.time() - start_time
 
             #k means clustering
+            start_time = time.time()
             kmeans.partial_fit(X_train, y_train)
+            d['kmeans'] += time.time() - start_time
             
         else:
             X_test = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
@@ -99,29 +122,41 @@ def func(rdd):
             y_test = le.fit_transform(np.array([x['feature2']  for x in df_list]))
 
             #multinomial nb
+            start_time = time.time()
             pred = mnb.predict(X_test)
+            d['mnb'] += time.time() - start_time
             print("\nMultinomial NB: ")
             print_stats(y_test, pred)
 
             #perceptron
+            start_time = time.time()
             pred = per.predict(X_test)
+            d['per'] += time.time() - start_time
             print("\nPerceptron: ")
             print_stats(y_test, pred)
 
             #sgdclassifier
+            start_time = time.time()
             pred = sgd.predict(X_test)
+            d['sgd'] += time.time() - start_time
             print("\nSGD Classifier: ")
             print_stats(y_test, pred)
 
             #k means clustering
+            start_time = time.time()
             pred = kmeans.predict(X_test)
+            d['kmeans'] += time.time() - start_time
             print("\nK-Means: ")
             print_stats(y_test, pred)
 
         N += 1
         
-        N = N % BATCH_SIZE
+        if N == BATCH_SIZE:
+            for k, v in d.items():
+                print(k, end = " ")
+                print(f"time : %.3f secs" %v)
 
+        N = N % BATCH_SIZE
 
 
 lines = ssc.socketTextStream("localhost", 6100)
@@ -131,3 +166,5 @@ lines.foreachRDD(func)
 ssc.start()
 ssc.awaitTermination()
 ssc.stop()
+
+#batch_size on x axis time on y axis
