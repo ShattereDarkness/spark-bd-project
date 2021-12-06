@@ -88,8 +88,6 @@ def func(rdd):
 
             #k means clustering
             kmeans.partial_fit(X_train, y_train)
-            N += 1
-            print(N)
             
         else:
             X_test = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
