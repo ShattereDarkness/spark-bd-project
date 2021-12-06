@@ -32,7 +32,7 @@ sgd = SGDClassifier(warm_start=True)
 per = Perceptron(warm_start=True)
 kmeans = MiniBatchKMeans(n_clusters=2)
 N = 0
-
+classes = []
 
 def removeNonAlphabets(s):
 
@@ -58,6 +58,7 @@ def print_stats(y, pred):
 
 def train_func(rdd):
     global N
+    global classes
     l = rdd.collect()
 
     if len(l):
@@ -69,22 +70,26 @@ def train_func(rdd):
 
         y_train = le.fit_transform(np.array([x['feature2']  for x in df_list]))
         
+        if N == 0:
+            classes = np.unique(y_train)
+
         #multinomial nb
-        mnb.partial_fit(X_train, y_train, classes = np.unique(y_train))
+        mnb.partial_fit(X_train, y_train, classes = classes)
 
         #perceptron
-        per.partial_fit(X_train, y_train, classes = np.unique(y_train))
+        per.partial_fit(X_train, y_train, classes = classes)
 
         #sgdclassifier
-        sgd.partial_fit(X_train, y_train, classes = np.unique(y_train))
+        sgd.partial_fit(X_train, y_train, classes = classes)
 
         #k means clustering
         kmeans.partial_fit(X_train, y_train)
         N += 1
+        print(N)
 
 
 def test_func(rdd):
-
+    global N
     l = rdd.collect()
 
     if len(l):
@@ -112,14 +117,15 @@ def test_func(rdd):
         pred = kmeans.predict(X_test)
         print_stats(y_test, pred)
 
+        N += 1
+        print(N)
+
 
 lines = ssc.socketTextStream("localhost", 6100)
 
-if N <= 30:
+if N < 30:
     lines.foreachRDD(train_func)
-    print(N)
 else:
-    print(N)
     lines.foreachRDD(test_func)
 
 ssc.start()
