@@ -11,6 +11,7 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import Perceptron, SGDClassifier
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, f1_score, classification_report
+from sklearn.feature_extraction import text
 
 import json
 import re
@@ -48,11 +49,26 @@ TEST_SIZE = int(3373/args.batch_size)
 BATCH_SIZE = TRAIN_SIZE + TEST_SIZE
 
 def removeNonAlphabets(s):
-
     s.lower()
     regex = re.compile('[^a-z\s]')
     s = regex.sub('', s)   
     return s
+
+def removeStopWords(s):
+    stop_words = list(text.ENGLISH_STOP_WORDS)
+    res = []
+
+    for sentence in s:
+        words = sentence.split()
+        temp = []
+        for word in words:
+            if word not in stop_words:
+                temp.append(word)
+        
+        temp = ' '.join(temp)
+        res.append(temp)
+    
+    return res
 
 def print_stats(y, pred):
 
@@ -84,12 +100,17 @@ def func(rdd):
         df_list = df.collect()
 
         if N < TRAIN_SIZE:
-            X_train = vectorizer.fit_transform([(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list])
+            # Remove non alphabetic characters
+            non_alphabetic = [(removeNonAlphabets(x['feature0'] + ' ' + x['feature1'])) for x in df_list]
+
+            # Remove stop words
+            no_stop_words = removeStopWords(non_alphabetic)
+
+            X_train = vectorizer.fit_transform(no_stop_words)
 
             y_train = le.fit_transform(np.array([x['feature2']  for x in df_list]))
             
-            if N == 0:                
-                print(args.batch_size)
+            if N == 0:
                 classes = np.unique(y_train)
                 d['mnb'] = 0
                 d['per'] = 0
